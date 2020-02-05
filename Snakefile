@@ -116,7 +116,7 @@ rule all:
 #		expand("results/{name}/REPEATMASKER/repeatmasker.status.ok", name=samples.index.tolist()),
 #		expand("results/{name}/REPEATMASKER/{name}.masked.final.out.reformated.gff", name=samples.index.tolist()),
 #		expand("results/{name}/NR_PROTEIN_EVIDENCE/nr.status.ok", name=samples.index.tolist()),
-		expand("results/{name}/GENOME_PARTITIONS/splitting.ok", name=samples.index.tolist()),
+#		expand("results/{name}/GENOME_PARTITIONS/splitting.ok", name=samples.index.tolist()),
 #		expand("results/{name}/MAKER.PASS1/init.ok", name=samples.index.tolist())
 #		expand("results/{name}/MAKER.PASS1/splitting.ok", name=samples.index.tolist())
 #		expand("results/{unit.sample}/MAKER.PASS1/{unit.unit}/{unit.sample}.{unit.unit}.fasta", unit=units.itertuples())
@@ -127,10 +127,10 @@ rule all:
 #		expand("results/{name}/MAKER.PASS1/{name}.noseq.maker.gff", name=samples.index.tolist()),
 #		expand("results/{name}/SNAP.PASS2/{name}.MAKER_PASS1.snap.hmm", name=samples.index.tolist()),
 #		expand("results/{name}/AUGUSTUS.PASS2/augustus.ok", name=samples.index.tolist())
-		expand("results/{name}/MAKER.PASS2/init.ok", name=samples.index.tolist()),
+#		expand("results/{name}/MAKER.PASS2/init.ok", name=samples.index.tolist()),
 #		expand("results/{name}/MAKER.PASS2/splitting.ok", name=samples.index.tolist()),
-		expand("results/{unit.sample}/MAKER.PASS2/{unit.unit}/{unit.sample}.{unit.unit}.all.maker.gff", unit=units.itertuples()),
-		expand("results/{unit.sample}/MAKER.PASS2/{unit.unit}/{unit.sample}.{unit.unit}.noseq.maker.gff", unit=units.itertuples()),
+#		expand("results/{unit.sample}/MAKER.PASS2/{unit.unit}/{unit.sample}.{unit.unit}.all.maker.gff", unit=units.itertuples()),
+#		expand("results/{unit.sample}/MAKER.PASS2/{unit.unit}/{unit.sample}.{unit.unit}.noseq.maker.gff", unit=units.itertuples()),
 		expand("results/{unit.sample}/MAKER.PASS2/{unit.unit}/{unit.sample}.{unit.unit}.maker.output.tar.gz", unit=units.itertuples()),
 		expand("results/{name}/MAKER.PASS2/{name}.all.maker.gff", name=samples.index.tolist()),
 		expand("results/{name}/MAKER.PASS2/{name}.noseq.maker.gff", name=samples.index.tolist())
@@ -155,9 +155,9 @@ rule busco:
 		fasta = get_assembly_path
 	params:
 		prefix = "{sample}",
-		busco_set = "data/BUSCO/arthropoda_odb9/",
-		augustus_species = "fly"
-	threads: 8
+		busco_set = "data/BUSCO/eukaryota_odb9/",
+		augustus_species = "schistosoma"
+	threads: config["threads"]["busco"]
 	singularity:
 		"docker://chrishah/busco-docker:v3.1.0"
 	log:
@@ -201,7 +201,7 @@ rule cegma:
 		fasta = get_assembly_path
 	params:
 		prefix = "{sample}"
-	threads: 10
+	threads: config["threads"]["cegma"]
 	singularity:
 		"docker://chrishah/cegma:2.5"
 	log:
@@ -293,10 +293,11 @@ rule snap_pass1:
 		"""
 rule repeatmodeler:
 	input:
-		fasta = get_assembly_path
+		fasta = get_assembly_path,
+		ok = rules.initiate.output
 	params:
 		prefix = "{sample}",
-	threads: 5
+	threads: config["threads"]["repeatmodeler"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -342,7 +343,7 @@ rule repeatmasker:
 		prefix = "{sample}",
 		repeat_taxon = "eukaryota",
 		conversion_script = "bin/convert_repeatmasker_gff_to_MAKER_compatible_gff.sh"
-	threads: 10
+	threads: config["threads"]["repeatmasker"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -418,14 +419,13 @@ rule repeatmasker:
 
 rule prepare_protein_evidence:
 	input:
-		expand("{full}/{file}", full=[os.getcwd()], file=glob.glob("data/protein_evidence/*.fasta.gz"))
-#		get_protein_evidence_path
-#		["/home/lv71312/hahnc/SNAKEMAKE/maker/data/protein_evidence/uniprot_sprot.fasta.gz", "/home/lv71312/hahnc/SNAKEMAKE/maker/data/protein_evidence/other.fasta.gz"]
+		expand("{full}/{file}", full=[os.getcwd()], file=glob.glob("data/protein_evidence/*.gz")),
+		ok = rules.initiate.output
 	params:
 		prefix = "{sample}",
 		mem = "8000",
 		similarity = "0.98"
-	threads: 2
+	threads: config["threads"]["prepare_protein_evidence"]
 	singularity:
 		"docker://chrishah/cdhit:v4.8.1"
 	log:
@@ -472,7 +472,8 @@ rule prepare_protein_evidence:
 
 rule split_fasta:
 	input:
-		fasta = get_assembly_path
+		fasta = get_assembly_path,
+		ok = rules.initiate.output
 	params:
 		prefix = "{sample}",
 		outdir = "results/{sample}/GENOME_PARTITIONS/"
@@ -616,7 +617,7 @@ rule run_MAKER_PASS1:
 		sub = "results/{sample}/GENOME_PARTITIONS/{unit}/p0001",
 		dir = "{unit}",
 		prefix = "{sample}"
-	threads: 9
+	threads: config["threads"]["run_MAKER_PASS1"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -694,7 +695,7 @@ rule snap_pass2:
 	input:
 		rules.merge_MAKER_PASS1.output.all_gff
 	params:
-		aed = "config["aed"]["snap_pass2"],
+		aed = config["aed"]["snap_pass2"],
 		prefix = "{sample}",
 		script = "bin/snap.p2.sh"
 	singularity:
@@ -730,7 +731,7 @@ rule AUGUSTUS_PASS2:
 		prefix = "{sample}",
 		training_params = "results/{sample}/BUSCO/run_{sample}/augustus_output/retraining_parameters",
 		script = "bin/augustus.PASS2.sh",
-		aed = "config["aed"]["AUGUSTUS_PASS2"]
+		aed = config["aed"]["AUGUSTUS_PASS2"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -900,7 +901,7 @@ rule run_MAKER_PASS2:
 		sub = "results/{sample}/GENOME_PARTITIONS/{unit}/p0001",
 		dir = "{unit}",
 		prefix = "{sample}"
-	threads: 2
+	threads: config["threads"]["run_MAKER_PASS2"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
