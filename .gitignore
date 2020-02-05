@@ -1,0 +1,5 @@
+.RepeatMaskerCache/
+.snakemake/
+results/
+slurm-*
+slurm-*

@@ -5,7 +5,6 @@
 #SBATCH --ntasks-per-node=30
 #SBATCH --ntasks-per-core=1
 #SBATCH --mem=50G
-#SBATCH --time=07:00:00
 
 #SBATCH --qos mem_0096
 #SBATCH --partition=mem_0096
@@ -27,6 +26,6 @@ conda activate snakemake
 echo -e "\n$(date) - Started\n"
 
 #run snakemake
-snakemake -p --use-singularity
+snakemake -p --use-singularity -j $SLURM_NTASKS_PER_NODE
 
 echo -e "\n$(date) - Finished\n"

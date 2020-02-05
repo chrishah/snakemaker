@@ -27,3 +27,6 @@ snakemake -s Snakefile_immediate_submit \
         --cluster '$(pwd)/bin/immediate_submit.py {dependencies}' \
         --immediate-submit --notemp -pr
 ```
+
+The pipeline currenlty consits of 20 rules, i.e. when distributed on the cluster, the pipeline will submit __per sample__ 19 jobs, plus the all rule. The idea is that MAKER is speed up by splitting up assemblies into batches of smaller size. 
+Per sample the pipeline currently submits at least 19 jobs, plus 1 for the all rule. 

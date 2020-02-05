@@ -1,2 +1,7 @@
 samples: "data/data.csv"
-        
+
+split_batch_length: 1000000
+
+aed:
+   snap_pass2: "0.2"
+   AUGUSTUS_PASS2: "1"

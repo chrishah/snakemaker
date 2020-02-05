@@ -32,11 +32,15 @@ if len(sample) > 0:
 job_properties["cluster"]["output"] = job_properties["cluster"]["output"].replace("stdout.txt", job_properties["rule"]+"."+sample+".stdout.txt")
 job_properties["cluster"]["error"] = job_properties["cluster"]["error"].replace("stderr.txt", job_properties["rule"]+"."+sample+".stderr.txt")
 
+#determine threads from the Snakemake profile, i.e. as determined in the Snakefile and the main config file respectively
+job_properties["cluster"]["ntasks"] = job_properties["threads"]
+job_properties["cluster"]["ntasks-per-node"] = job_properties["threads"]
+
 # create list with command line arguments
 cmdline = ["sbatch"]
 
 # create string for slurm submit options for rule
-slurm_args = "--partition={partition} --qos={qos} --mem={mem} --ntasks={ntasks} --ntasks-per-node={ntasks-per-node} --time={time} --hint={hint} --output={output} --output={output} -N {N} -J {J}".format(**job_properties["cluster"])
+slurm_args = "--partition={partition} --qos={qos} --mem={mem} --ntasks={ntasks} --ntasks-per-node={ntasks-per-node} --time={time} --hint={hint} --output={output} --error={error} -N {N} -J {J}".format(**job_properties["cluster"])
 cmdline.append(slurm_args)
 
 # now work on dependencies
@@ -50,4 +54,3 @@ cmdline.append(jobscript)
 
 #now write final commandback to the system
 os.system(" ".join(cmdline))
-

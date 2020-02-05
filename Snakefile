@@ -4,33 +4,84 @@ import pandas as pd
 import os
 import glob
 from math import ceil
-WD=os.getcwd()
+from pathlib import Path
 
 localrules: initiate, all
 
-n=1
+n=int(config["split_batch_length"])
 
 samples = pd.read_csv(config["samples"], sep="\t").set_index("sample", drop=False)
 samples.index.names = ["sample_id"]
 
 dic = {'sample': [], 'unit': []}
 
+#function that partitions the fasta file
+def parition_by_length(fasta, max_length=1000000, pr=0, outdir="./"):
+	headers = []
+	seqs = []
+	i=0
+	cum_length=0
+	printcount=1
+	for line in open(str(fasta)).readlines():
+		if line.strip().startswith(">"):
+			headers.append(line.strip())
+			seqs.append("")
+			if i >= 1:
+				cum_length+=len(seqs[-2])
+#				print("%s\t%s\t%s" %(headers[-2], len(seqs[-2]), cum_length))
+			if cum_length >= max_length:
+				if pr:
+					os.mkdir(outdir+"/"+str(printcount).zfill(4))
+					fh = open(outdir+"/"+str(printcount).zfill(4)+"/p0001", 'w')
+#					print("%s\t%s" %(str(printcount).zfill(4), cum_length)) #"{:04d}".format(printcount))
+					for j in range(len(headers)-1):
+						fh.write("%s\n%s\n" %(headers[j],seqs[j]))
+					fh.close()
+				for j in reversed(range(len(headers)-1)):
+					del headers[j]
+					del seqs[j]
+					cum_length=len(seqs[-1])
+#				print("the lenght is again: %s" %len(headers))
+				printcount+=1
+			i+=1
+		else:
+			seqs[-1] = seqs[-1]+line.strip()
+
+	if pr:
+		os.mkdir(outdir+"/"+str(printcount).zfill(4))
+		fh = open(outdir+"/"+str(printcount).zfill(4)+"/p0001", 'w')
+
+#		print("%s\t%s" %(str(printcount).zfill(4), cum_length+len(seqs[-1])))
+		for j in range(len(headers)):
+			fh.write("%s\n%s\n" %(headers[j],seqs[j]))
+		fh.close()
+
+	if not pr:
+		return printcount
+
 for sample in samples.index.values.tolist():
-#    print sample,samples.fasta[sample]
-    counter=0
-    for line in open(samples.fasta[sample]):
-        if line.startswith(">"):
-            counter+=1
-#    print int(ceil(counter/float(n)))
-    for i in range(1,int(ceil(counter/float(n)))+1):
+    counter=parition_by_length(str(samples.fasta[sample]), max_length=n, pr=0) 
+    for i in range(1,counter+1):
         dic['sample'].append(sample)
         dic['unit'].append(str(i).zfill(4))
+	
 
-#print dic
+#for sample in samples.index.values.tolist():
+##    print sample,samples.fasta[sample]
+#    counter=0
+#    for line in open(samples.fasta[sample]):
+#        if line.startswith(">"):
+#            counter+=1
+##    print int(ceil(counter/float(n)))
+#    for i in range(1,int(ceil(counter/float(n)))+1):
+#        dic['sample'].append(sample)
+#        dic['unit'].append(str(i).zfill(4))
+#
+##print dic
 units = pd.DataFrame(dic).set_index(['sample','unit'], drop=False)
 #print units
-for row in units.itertuples():
-    print(row)
+#for row in units.itertuples():
+#    print(row)
 
 #units = pd.read_csv(config["units"], dtype=str, sep="\t").set_index(["sample", "unit"], drop=False)
 units.index.names = ["sample_id", "unit_id"]
@@ -65,6 +116,7 @@ rule all:
 #		expand("results/{name}/REPEATMASKER/repeatmasker.status.ok", name=samples.index.tolist()),
 #		expand("results/{name}/REPEATMASKER/{name}.masked.final.out.reformated.gff", name=samples.index.tolist()),
 #		expand("results/{name}/NR_PROTEIN_EVIDENCE/nr.status.ok", name=samples.index.tolist()),
+		expand("results/{name}/GENOME_PARTITIONS/splitting.ok", name=samples.index.tolist()),
 #		expand("results/{name}/MAKER.PASS1/init.ok", name=samples.index.tolist())
 #		expand("results/{name}/MAKER.PASS1/splitting.ok", name=samples.index.tolist())
 #		expand("results/{unit.sample}/MAKER.PASS1/{unit.unit}/{unit.sample}.{unit.unit}.fasta", unit=units.itertuples())
@@ -423,39 +475,13 @@ rule split_fasta:
 		fasta = get_assembly_path
 	params:
 		prefix = "{sample}",
-		seqs_per_file = "1"
-	singularity:
-		"docker://chrishah/ectools-docker"
+		outdir = "results/{sample}/GENOME_PARTITIONS/"
+#		len = n
 	output:
 		ok = "results/{sample}/GENOME_PARTITIONS/splitting.ok"
-	shell:
-		"""
-		basedir=$(pwd)
-
-		#get going
-		echo -e "\n$(date)\tStarting ...\n"
-
-		if [[ ! -d results/{params.prefix}/GENOME_PARTITIONS ]]
-		then
-			mkdir results/{params.prefix}/GENOME_PARTITIONS
-		fi
-		cd results/{params.prefix}/GENOME_PARTITIONS
-		
-		echo -e "\nSplitting up assembly ({input.fasta}): {params.seqs_per_file} sequence(s) per file\n"
-		partition.py {params.seqs_per_file} 1 $basedir/{input.fasta}
-		
-		retVal=$?
-
-		echo -e "\n$(date)\tFinished!\n"
-
-		if [ ! $retVal -eq 0 ]
-		then
-			echo "There was some error"
-			exit $retVal
-		else
-			touch ../../../{output.ok}
-		fi
-		"""
+	run:
+		parition_by_length(input.fasta, max_length=n, pr=1, outdir=params.outdir)
+		Path(output.ok).touch()		
 
 rule initiate_MAKER_PASS1:
 	input:
@@ -668,7 +694,7 @@ rule snap_pass2:
 	input:
 		rules.merge_MAKER_PASS1.output.all_gff
 	params:
-		aed = "0.2",
+		aed = "config["aed"]["snap_pass2"],
 		prefix = "{sample}",
 		script = "bin/snap.p2.sh"
 	singularity:
@@ -704,7 +730,7 @@ rule AUGUSTUS_PASS2:
 		prefix = "{sample}",
 		training_params = "results/{sample}/BUSCO/run_{sample}/augustus_output/retraining_parameters",
 		script = "bin/augustus.PASS2.sh",
-		aed = "1"
+		aed = "config["aed"]["AUGUSTUS_PASS2"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -719,6 +745,7 @@ rule AUGUSTUS_PASS2:
 		basedir=$(pwd)
 		
 		echo -e "TODO: CHECK FOR cDNA evidence and include in autoAug.pl run via --cdna=cdna.fa option - see 'Typical Usage' in Readme of autoAug.pl script"		
+		echo -e "TODO: RUN Augustus across a range of aed cutoffs and use the one that has the best prediction accuracy"		
 
 		if [[ ! -d results/{params.prefix}/AUGUSTUS.PASS2 ]]
 		then

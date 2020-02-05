@@ -29,8 +29,8 @@ for sample in samples.index.values.tolist():
 #print dic
 units = pd.DataFrame(dic).set_index(['sample','unit'], drop=False)
 #print units
-for row in units.itertuples():
-    print(row)
+#for row in units.itertuples():
+#    print(row)
 
 #units = pd.read_csv(config["units"], dtype=str, sep="\t").set_index(["sample", "unit"], drop=False)
 units.index.names = ["sample_id", "unit_id"]
