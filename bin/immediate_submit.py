@@ -48,7 +48,7 @@ if dependencies:
     cmdline.append("--dependency")
     # only keep numbers (which are the jobids) in dependencies list. this is necessary because slurm returns more than the jobid. For other schedulers this could be different!
     dependencies = [x for x in dependencies if x.isdigit()]
-    cmdline.append("afterok:" + ",".join(dependencies))
+    cmdline.append("afterok:" + ":".join(dependencies))
 
 cmdline.append(jobscript)
 

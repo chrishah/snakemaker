@@ -1,19 +1,23 @@
 samples: "data/data.csv"
 
 split_batch_length: 1000000
+split_min_length: 1000
 
+busco:
+   set: eukaryota_odb9
+   species: schistosoma
 aed:
    snap_pass2: "0.2"
-   AUGUSTUS_PASS2: "1"
+   AUGUSTUS_PASS2: "0.1"
 
 threads:
    busco: 8
    cegma: 8
    snap_pass1: 1
-   repeatmodeler: 10
-   repeatmasker: 10
-   prepare_protein_evidence: 10
-   run_MAKER_PASS1: 20
+   repeatmodeler: 8
+   repeatmasker: 8
+   prepare_protein_evidence: 8
+   run_MAKER_PASS1: 8
    snap_pass2: 1
    AUGUSTUS_PASS2: 1
-   run_MAKER_PASS2: 20
+   run_MAKER_PASS2: 8

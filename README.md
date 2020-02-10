@@ -20,12 +20,12 @@ data/snakemake_submit_VSC4.slurm.sh
 
 Distribute on cluster, e.g. on VSC4:
 ```bash
-snakemake -s Snakefile_immediate_submit \
-        --jobs 100 --latency-wait 30 \
-        --use-singularity \
+snakemake -s Snakefile \
+        --jobs 300 --latency-wait 30 \
+        --use-singularity --singularity-args "-B $(pwd)" \
         --cluster-config data/cluster_config_vsc4.yaml \
         --cluster '$(pwd)/bin/immediate_submit.py {dependencies}' \
-        --immediate-submit --notemp -pr
+        --immediate-submit --notemp -r -p
 ```
 
 The pipeline currenlty consits of 20 rules, i.e. when distributed on the cluster, the pipeline will submit __per sample__ 19 jobs, plus the all rule. The idea is that MAKER is speed up by splitting up assemblies into batches of smaller size. 

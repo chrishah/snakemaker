@@ -79,7 +79,7 @@ merge_MAKER_PASS1:
 #   ntasks: 1
 #   ntasks-per-node: 1
    mem: 4G
-   time: "00:01:00"
+   time: "01:00:00"
 snap_pass2:
    J: SNA2
 #   ntasks: 1
@@ -115,4 +115,4 @@ merge_MAKER_PASS2:
 #   ntasks: 2
 #   ntasks-per-node: 2
    mem: 4G
-   time: "00:02:00"
+   time: "00:05:00"

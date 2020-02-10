@@ -9,6 +9,7 @@ from pathlib import Path
 localrules: initiate, all
 
 n=int(config["split_batch_length"])
+min=int(config["split_min_length"])
 
 samples = pd.read_csv(config["samples"], sep="\t").set_index("sample", drop=False)
 samples.index.names = ["sample_id"]
@@ -16,7 +17,7 @@ samples.index.names = ["sample_id"]
 dic = {'sample': [], 'unit': []}
 
 #function that partitions the fasta file
-def parition_by_length(fasta, max_length=1000000, pr=0, outdir="./"):
+def partition_by_length(fasta, max_length=1000000, min_length=1000, pr=0, outdir="./"):
 	headers = []
 	seqs = []
 	i=0
@@ -27,8 +28,12 @@ def parition_by_length(fasta, max_length=1000000, pr=0, outdir="./"):
 			headers.append(line.strip())
 			seqs.append("")
 			if i >= 1:
-				cum_length+=len(seqs[-2])
-#				print("%s\t%s\t%s" %(headers[-2], len(seqs[-2]), cum_length))
+				if len(seqs[-2]) >= min_length:
+					cum_length+=len(seqs[-2])
+#					print("%s\t%s\t%s" %(headers[-2], len(seqs[-2]), cum_length))
+				else:
+					del headers[-2]
+					del seqs[-2]
 			if cum_length >= max_length:
 				if pr:
 					os.mkdir(outdir+"/"+str(printcount).zfill(4))
@@ -60,7 +65,7 @@ def parition_by_length(fasta, max_length=1000000, pr=0, outdir="./"):
 		return printcount
 
 for sample in samples.index.values.tolist():
-    counter=parition_by_length(str(samples.fasta[sample]), max_length=n, pr=0) 
+    counter=partition_by_length(str(samples.fasta[sample]), max_length=n, min_length=min, pr=0) 
     for i in range(1,counter+1):
         dic['sample'].append(sample)
         dic['unit'].append(str(i).zfill(4))
@@ -109,6 +114,15 @@ def get_protein_evidence_path(p="data/protein_evidence/*.fasta.gz"):
 	import glob, os
 	return [os.path.abspath(x) for x in glob.glob(p)]
 
+def get_transcripts_path(wildcards, p="data/transcripts/*"):
+	dic = {'alt_ests': [], 'ests': []}
+	for f in glob.glob(p):
+		if f.split("/")[-1].startswith(wildcards.sample):
+			dic['ests'].append(os.path.abspath(f))
+		else:
+			dic['alt_ests'].append(os.path.abspath(f))
+	return dic
+
 rule all:
 	input:
 #		expand("results/{name}/BUSCO/run_{name}/single_copy_busco_sequences/{name}.BUSCOs.fasta", name=samples.index.tolist()),
@@ -155,8 +169,9 @@ rule busco:
 		fasta = get_assembly_path
 	params:
 		prefix = "{sample}",
-		busco_set = "data/BUSCO/eukaryota_odb9/",
-		augustus_species = "schistosoma"
+		busco_path = "data/BUSCO",
+		busco_set = config["busco"]["set"],
+		augustus_species = config["busco"]["species"]
 	threads: config["threads"]["busco"]
 	singularity:
 		"docker://chrishah/busco-docker:v3.1.0"
@@ -186,7 +201,7 @@ rule busco:
 
 		#run BUSCO
 		run_BUSCO.py \
-		--in ../../../{input.fasta} --out {params.prefix} -l ../../../{params.busco_set} --mode genome -c {threads} -f \
+		--in ../../../{input.fasta} --out {params.prefix} -l ../../../{params.busco_path}/{params.busco_set} --mode genome -c {threads} -f \
 		-sp {params.augustus_species} --long --augustus_parameters='--progress=true' 1> ../../../{log.stdout} 2> ../../../{log.stderr}
 
 		#collect predicted BUSCOs
@@ -244,7 +259,7 @@ rule snap_pass1:
 		fasta = get_assembly_path
 	params:
 		prefix = "{sample}",
-		aed = ""
+		script = "bin/snap.p1.sh"
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -255,7 +270,8 @@ rule snap_pass1:
 		hmm = "results/{sample}/SNAP.PASS1/{sample}.cegma.snap.hmm"
 	shell:
 		"""
-		echo -e "\n$(date)\tStarting ...\n"
+		basedir=$(pwd)
+		echo -e "\n$(date)\tStarting SNAP PASS 1 ...\n"
 
 		if [[ ! -d results/{params.prefix}/SNAP.PASS1 ]]
 		then
@@ -263,34 +279,24 @@ rule snap_pass1:
 		fi
 		cd results/{params.prefix}/SNAP.PASS1
 
-		echo -e "[$(date)]\tConvert CEGMA gff to SNAP input"
-		cegma2zff ../../../{input.cegma_gff} ../../../{input.fasta}
-
-		echo -e "[$(date)]\tgather some stats and validate"
-		fathom genome.ann genome.dna -gene-stats > gene-stats.log 2>&1
-		fathom genome.ann genome.dna -validate > validate.log 2>&1
-		
-		echo -e "[$(date)]\tcollect the training sequences and annotations, plus 1000 surrounding bp for training"
-		fathom genome.ann genome.dna -categorize 1000
-		fathom -export 1000 -plus uni.ann uni.dna
-
-		echo -e "[$(date)]\tcreate the training parameters"
-		forge export.ann export.dna
-
-		echo -e "[$(date)]\tassemble the HMMs"
-		hmm-assembler.pl {params.prefix} . > ../../../{output.hmm}
+		bash $basedir/{params.script} \
+		{params.prefix} \
+		$basedir/{input.cegma_gff} \
+		$basedir/{input.fasta} \
+		1> $basedir/{log.stdout} 2> $basedir/{log.stderr}
 
 		retVal=$?
-		echo -e "\n$(date)\tFinished!\n"
+		echo -e "\n$(date)\tFinished - SNAP PASS 1!\n"
 
 		if [ ! $retVal -eq 0 ]
 		then
 			echo "SNAP ended in an error"
 			exit $retVal
 		else
-			touch ../../../{output.ok}
+			touch $basedir/{output.ok}
 		fi
 		"""
+
 rule repeatmodeler:
 	input:
 		fasta = get_assembly_path,
@@ -419,7 +425,7 @@ rule repeatmasker:
 
 rule prepare_protein_evidence:
 	input:
-		expand("{full}/{file}", full=[os.getcwd()], file=glob.glob("data/protein_evidence/*.gz")),
+		proteins = expand("{full}/{file}", full=[os.getcwd()], file=glob.glob("data/protein_evidence/*.gz")),
 		ok = rules.initiate.output
 	params:
 		prefix = "{sample}",
@@ -444,10 +450,10 @@ rule prepare_protein_evidence:
 		fi
 		cd results/{params.prefix}/NR_PROTEIN_EVIDENCE
 
-		echo -e "Remove redundancy at {params.similarity} in files:\n{input}"
+		echo -e "Remove redundancy at {params.similarity} in files:\n{input.proteins}"
 
 		#concatenate all physical evidence
-		cat {input} > external_proteins.fasta.gz
+		cat {input.proteins} > external_proteins.fasta.gz
 
 		#run cd-hit
 		cd-hit -T {threads} -M {params.mem} -i external_proteins.fasta.gz -o external_proteins.cd-hit-{params.similarity}.fasta -c {params.similarity} 1> ../../../{log.stdout} 2> ../../../{log.stderr}
@@ -481,7 +487,7 @@ rule split_fasta:
 	output:
 		ok = "results/{sample}/GENOME_PARTITIONS/splitting.ok"
 	run:
-		parition_by_length(input.fasta, max_length=n, pr=1, outdir=params.outdir)
+		partition_by_length(input.fasta, max_length=n, min_length=min, pr=1, outdir=params.outdir)
 		Path(output.ok).touch()		
 
 rule initiate_MAKER_PASS1:
@@ -493,8 +499,8 @@ rule initiate_MAKER_PASS1:
 		repmas_gff = rules.repeatmasker.output.gff
 	params:
 		prefix = "{sample}",
-		alt_est = expand("{full}/{files}", full=[os.getcwd()], files=glob.glob("data/transcripts_alt/*")),
-		est = expand("{full}/{files}", full=[os.getcwd()], files=glob.glob("data/transcripts/*"))
+		transcripts = get_transcripts_path,
+		script = "bin/prepare_maker_opts_PASS1.sh"
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -504,6 +510,8 @@ rule initiate_MAKER_PASS1:
 		ok = "results/{sample}/MAKER.PASS1/init.ok"
 	shell:
 		"""
+		basedir=$(pwd)
+
 		#get going
 		echo -e "\n$(date)\tStarting ...\n"
 
@@ -513,64 +521,30 @@ rule initiate_MAKER_PASS1:
 		fi
 		cd results/{params.prefix}/MAKER.PASS1
 
-		maker -CTL 1> ../../../{log.stdout} 2> ../../../{log.stderr}
+		maker -CTL 1> $basedir/{log.stdout} 2> $basedir/{log.stderr}
 		retVal=$?
 
 		##### Modify maker_opts.ctl file
-		#add SNAP result if present
-		if [ -f "../../../{input.snap}" ]
-		then
-        		echo -e "SNAP hmms provided: {input.snap}"
-        		sed -i "s?snaphmm= ?snaphmm=$(pwd)/../../../{input.snap} ?" maker_opts.ctl
-		fi
-		#add protein evidence if present
-		if [ -f "../../../{input.nr_evidence}" ] || [ -f "../../../{input.busco_proteins}" ]
-		then
-			paths=""
-        		if [ -f "../../../{input.nr_evidence}" ]; then echo -e "Protein evidence provided: {input.nr_evidence}"; paths="$paths,$(pwd)/../../../{input.nr_evidence}"; fi
-        		if [ -f "../../../{input.busco_proteins}" ]; then echo -e "BUSCO proteins provided: {input.busco_proteins}"; paths="$paths,$(pwd)/../../../{input.nr_evidence}"; fi
-			paths=$(echo $paths | sed 's/^,//')
-        		sed -i "s?protein= ?protein=$paths ?" maker_opts.ctl
-		fi
-		#add denovo repeat library if present
-		if [ -f "../../../{input.repmod_lib}" ]
-		then
-		        echo -e "Denovo repeat library provided: {input.repmod_lib}"
-		        sed -i "s?rmlib= ?rmlib=$(pwd)/../../../{input.repmod_lib} ?" maker_opts.ctl
-		fi
-		#add repeatmasker gff if present
-		if [ -f "../../../{input.repmas_gff}" ]
-		then
-        		echo -e "Repeatmasker gff provided: {input.repmas_gff}"
-        		sed -i "s?rm_gff= ?rm_gff=$(pwd)/../../../{input.repmas_gff} ?" maker_opts.ctl
-		fi
-
-		alt_est="{params.alt_est}"
-		if [ ! -z "$alt_est" ]
-		then
-			echo -e "Transcriptome evidence (altest) provided: {params.alt_est}"
-			sed -i "s?altest= ?altest=$(echo $alt_est | sed 's/ /,/g') ?" maker_opts.ctl
-		fi
-
-		est="{params.est}"
-		if [ ! -z "$est" ]
-		then
-			echo -e "Transcriptome evidence (est) provided: {params.est}"
-			sed -i "s?^est= ?est=$(echo $est | sed 's/ /,/g') ?" maker_opts.ctl
-		fi
-
-		sed -i 's/est2genome=0/est2genome=1/' maker_opts.ctl
-		sed -i 's/protein2genome=0/protein2genome=1/' maker_opts.ctl
-		############################
+		bash $basedir/{params.script} \
+		$basedir/{input.snap} \
+		$basedir/{input.nr_evidence} \
+		$basedir/{input.busco_proteins} \
+		$basedir/{input.repmod_lib} \
+		$basedir/{input.repmas_gff} \
+		altest="{params.transcripts[alt_ests]}" \
+		est="{params.transcripts[ests]}" \
+		1> $basedir/{log.stdout} 2> $basedir/{log.stderr}
+		
+		retVal=$(( retVal + $? ))
 
 		echo -e "\n$(date)\tFinished!\n"
 
 		if [ ! $retVal -eq 0 ]
 		then
-			echo "There was some error"
+			echo "There was some error" >> $basedir/{log.stderr}
 			exit $retVal
 		else
-			touch ../../../{output.ok}
+			touch $basedir/{output.ok}
 		fi
 		"""
 
@@ -731,9 +705,10 @@ rule AUGUSTUS_PASS2:
 		prefix = "{sample}",
 		training_params = "results/{sample}/BUSCO/run_{sample}/augustus_output/retraining_parameters",
 		script = "bin/augustus.PASS2.sh",
-		aed = config["aed"]["AUGUSTUS_PASS2"]
+		aed = config["aed"]["AUGUSTUS_PASS2"],
+		transcripts = get_transcripts_path 
 	singularity:
-		"docker://chrishah/maker-full:2.31.10"
+		"docker://chrishah/augustus:v3.3.2"
 	log:
 		stdout = "results/{sample}/logs/AUGUSTUS.PASS2.{sample}.stdout.txt",
 		stderr = "results/{sample}/logs/AUGUSTUS.PASS2.{sample}.stderr.txt"
@@ -762,6 +737,12 @@ rule AUGUSTUS_PASS2:
 		#copy augustus config directory from the image
 		cp -rf /usr/share/augustus/config tmp/config
 
+		est="{params.transcripts[ests]}"
+		if [ ! -z "$est" ]
+		then
+			cat $est > cdna.fasta	
+		fi
+
 		bash $basedir/{params.script} \
 		{params.prefix} \
 		$basedir/{input.fasta} \
@@ -769,6 +750,7 @@ rule AUGUSTUS_PASS2:
 		{params.aed} \
 		$(pwd)/tmp/config \
 		$basedir/{params.training_params} \
+		cdna.fasta \
 		1> $basedir/{log.stdout} 2> $basedir/{log.stderr}
 
 		retVal=$?

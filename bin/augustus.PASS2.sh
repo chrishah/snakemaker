@@ -6,6 +6,7 @@ proteins=$3
 aed=$4
 local_config=$5
 training_params=$6
+cdna=$7
 
 AUGUSTUS_CONFIG_PATH=$local_config
 
@@ -38,21 +39,34 @@ perl -ne 'chomp; if ($. == 1){$AED = $_}else{$h=$_; $s=<>; @a=split(" "); $a[2] 
 	proteins=$prefix.AED-st$aed.maker.proteins.fasta
 fi
 
-echo -e "[$(date)]\tRun AUGUSTUS"
-autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --singleCPU -v --useexisting
+if [ -f "$cdna" ]
+then
+	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --cdna=$cdna --singleCPU -v --useexisting"
+	echo -e "[$(date)]\tRunning autoAug.pl with cdna evidence:\n$cmd"
+	$cmd
+else
+	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --singleCPU -v --useexisting"
+	echo -e "[$(date)]\tRunning autoAug.pl without cdna evidence:\n$cmd"
+	$cmd
+fi
 retVal=$?
 
 if [ ! $retVal -eq 0 ]
 then
-	>&2 echo "Augustus ended in an error"
-	exit $retVal
+	if [ -s "$(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff"]
+	then
+		>&2 echo "Augustus ended in an error, but abinitio predictions are there - continuing .."
+	else
+		>&2 echo "Augustus ended in an error"
+		exit $retVal
+	fi
 fi
 
 #copy the training set that was produced
 cp -rf $local_config/species/$prefix .
 
 echo -e "[$(date)]Reformatting to $(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff to GFF3 -> $(pwd)/augustus.gff3"
-cat autoAug/results/predictions/augustus.abinitio.gff | perl -ne 'chomp; @a=split(/\t/); if ($a[2] eq 'gene'){$id=$a[-1]; $a[-1] =~ s/^/ID=/; print join("\t", @a)."\n"}else{if ($_ =~ /;$/){print "$_ Parent=$id\n"}else{print "$_; Parent=$id\n"}}' | sed 's/; /;/g' | sed 's/ /=/g' > augustus.gff3
+cat autoAug/autoAugPred_abinitio/predictions/augustus.gff | perl -ne 'chomp; @a=split(/\t/); if ($a[2] eq 'gene'){$id=$a[-1]; $a[-1] =~ s/^/ID=/; print join("\t", @a)."\n"}else{if ($_ =~ /;$/){print "$_ Parent=$id\n"}else{print "$_; Parent=$id\n"}}' | sed 's/; /;/g' | sed 's/ /=/g' > augustus.gff3
 
 #cat $(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff | perl -ne 'chomp; @a=split(/\t/); if ($a[2] eq 'gene'){$id=$a[-1]; $a[-1] =~ s/^/ID=/; print join("\t", @a)."\n"}else{if ($_ =~ /;$/){print "$_ Parent=$id\n"}else{print "$_; Parent=$id\n"}}' | sed 's/; /;/g' | sed 's/ /=/g' > $(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff3 
 
