@@ -53,7 +53,7 @@ retVal=$?
 
 if [ ! $retVal -eq 0 ]
 then
-	if [ -s "$(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff"]
+	if [ -s "$(pwd)/autoAug/autoAugPred_abinitio/predictions/augustus.gff" ]
 	then
 		>&2 echo "Augustus ended in an error, but abinitio predictions are there - continuing .."
 	else

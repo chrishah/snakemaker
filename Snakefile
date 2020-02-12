@@ -672,6 +672,7 @@ rule snap_pass2:
 		aed = config["aed"]["snap_pass2"],
 		prefix = "{sample}",
 		script = "bin/snap.p2.sh"
+	threads: config["threads"]["snap_pass2"]
 	singularity:
 		"docker://chrishah/maker-full:2.31.10"
 	log:
@@ -707,6 +708,7 @@ rule AUGUSTUS_PASS2:
 		script = "bin/augustus.PASS2.sh",
 		aed = config["aed"]["AUGUSTUS_PASS2"],
 		transcripts = get_transcripts_path 
+	threads: config["threads"]["AUGUSTUS_PASS2"]
 	singularity:
 		"docker://chrishah/augustus:v3.3.2"
 	log:
