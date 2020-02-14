@@ -746,6 +746,7 @@ rule AUGUSTUS_PASS2:
 		fi
 
 		bash $basedir/{params.script} \
+		{threads} \
 		{params.prefix} \
 		$basedir/{input.fasta} \
 		$basedir/{input.maker_proteins} \
@@ -960,4 +961,5 @@ rule merge_MAKER_PASS2:
 		cd results/{params.prefix}/MAKER.PASS2/
 
 		bash $basedir/{params.script} {params.prefix}
+
 		"""

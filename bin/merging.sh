@@ -31,4 +31,15 @@ awk '{ if ($2 ~ "augustus") print $0 }' $prefix.noseq.maker.gff > $prefix.noseq.
 #genes predicted by maker
 awk '{ if ($2 ~ "maker") print $0 }' $prefix.noseq.maker.gff > $prefix.noseq.maker.maker.gff
 
+#rename genes/transcripts
+#create backups
+cp $prefix.all.maker.gff $refix.all.maker.backup.gff
+cp $prefix.all.maker.proteins.fasta $prefix.all.maker.proteins.backup.fasta
+cp $prefix.all.maker.transcripts.fasta $prefix.all.maker.transcripts.backup.fasta
+
+maker_map_ids --prefix $prefix --justify 5 --suffix - --iterate 1 $prefix.all.maker.gff > $prefix.makerID2short.map
+map_gff_ids $prefix.makerID2short.map $prefix.all.maker.gff
+map_fasta_ids $prefix.makerID2short.map $prefix.all.maker.transcripts.fasta
+map_fasta_ids $prefix.makerID2short.map $prefix.all.maker.proteins.fasta
+
 echo -e "\n$(date)\tFinished!\n"

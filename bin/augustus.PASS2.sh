@@ -1,12 +1,13 @@
 #!/bin/bash
 
-prefix=$1
-fasta=$2
-proteins=$3
-aed=$4
-local_config=$5
-training_params=$6
-cdna=$7
+threads=$1
+prefix=$2
+fasta=$3
+proteins=$4
+aed=$5
+local_config=$6
+training_params=$7
+cdna=$8
 
 AUGUSTUS_CONFIG_PATH=$local_config
 
@@ -41,11 +42,11 @@ fi
 
 if [ -f "$cdna" ]
 then
-	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --cdna=$cdna --singleCPU -v --useexisting"
+	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --cdna=$cdna --singleCPU --threads $threads -v --useexisting"
 	echo -e "[$(date)]\tRunning autoAug.pl with cdna evidence:\n$cmd"
 	$cmd
 else
-	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --singleCPU -v --useexisting"
+	cmd="autoAug.pl --genome=$fasta --species=$prefix --trainingset=$proteins --singleCPU --threads $threads -v --useexisting"
 	echo -e "[$(date)]\tRunning autoAug.pl without cdna evidence:\n$cmd"
 	$cmd
 fi

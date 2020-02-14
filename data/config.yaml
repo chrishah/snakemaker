@@ -19,5 +19,5 @@ threads:
    prepare_protein_evidence: 8
    run_MAKER_PASS1: 8
    snap_pass2: 1
-   AUGUSTUS_PASS2: 1
+   AUGUSTUS_PASS2: 10
    run_MAKER_PASS2: 8
