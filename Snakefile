@@ -157,12 +157,14 @@ rule setup_maker:
 		echo -e "\n$(date)\tFinished!\n"
 		"""
 rule initiate:
-        params:
-                prefix = "{sample}"
-        output:
-                "results/{sample}/{sample}.ok"
-        shell:
-                """
+	input:
+		rules.setup_maker.output
+	params:
+		prefix = "{sample}"
+	output:
+		"results/{sample}/{sample}.ok"
+	shell:
+		"""
 		if [[ ! -d results/{params.prefix} ]]
 		then
 			mkdir results/{params.prefix}
@@ -617,7 +619,6 @@ rule prepare_protein_evidence:
 
 rule initiate_MAKER_PASS1:
 	input:
-		maker = rules.setup_maker.output.bin,
 		ok = rules.initiate.output,
 		snap = rules.snap_pass1.output.hmm,
 		nr_evidence = rules.prepare_protein_evidence.output.nr_proteins,
@@ -677,7 +678,6 @@ rule initiate_MAKER_PASS1:
 
 rule run_MAKER_PASS1:
 	input:
-		maker = rules.setup_maker.output.bin,
 		init_ok = rules.initiate_MAKER_PASS1.output.ok,
 		split_ok = rules.split.output.ok
 	params:
@@ -923,7 +923,6 @@ rule snap_pass2:
 
 rule initiate_MAKER_PASS2:
 	input:
-		maker = rules.setup_maker.output.bin,
 		pred_gff = rules.pick_augustus_training_set.output.gff,
 		params = rules.pick_augustus_training_set.output.best_params,
 		snaphmm = rules.snap_pass2.output.snap_hmm,
@@ -997,7 +996,6 @@ rule initiate_MAKER_PASS2:
 
 rule run_MAKER_PASS2:
 	input:
-		maker = rules.setup_maker.output.bin,
 		split_ok = rules.split.output.ok,
 		init_ok = rules.initiate_MAKER_PASS2.output.ok
 	params:
