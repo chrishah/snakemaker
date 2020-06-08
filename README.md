@@ -60,15 +60,15 @@ snakemake -s Snakefile \
         --immediate-submit --notemp -r -p
 ```
 
-Make the rulegraph:
+
+## **Rulegraph**
+
+<img src="https://github.com/chrishah/snakemaker/blob/master/rulegraph.png" eight="500">
+
+
+How the rulegraph was made (The detour via the temp file is just an ugly fix for now):
 ```bash
 snakemake --rulegraph > temp
 cat temp | grep "digraph" -A 1000 | dot -Tpng > rulegraph.png 
 rm temp
 ```
-
-## **Rulegraph**
-
-## Rulegraph
-
-<img src="https://github.com/chrishah/snakemaker/blob/master/rulegraph.png" eight="500">
