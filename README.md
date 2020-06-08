@@ -71,4 +71,4 @@ rm temp
 
 ## Rulegraph
 
-<img src="https://github.com/chrishah/snakemaker/blob/master/Snakefile/rulegraph.png" eight="500">
+<img src="https://github.com/chrishah/snakemaker/blob/master/rulegraph.png" eight="500">
