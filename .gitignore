@@ -3,3 +3,5 @@
 results/
 slurm-*
 slurm-*
+bin/RepeatMasker
+bin/maker
