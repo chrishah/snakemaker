@@ -196,7 +196,7 @@ rule split:
 
                 if [ ! $retVal -eq 0 ]
                 then
-                        echo "Genemark ended in an error"
+                        echo "Splitting ended in an error"
                         exit $retVal
                 else
                         touch ../../../{output.ok}
