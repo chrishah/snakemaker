@@ -40,7 +40,7 @@ job_properties["cluster"]["ntasks-per-node"] = job_properties["threads"]
 cmdline = ["sbatch"]
 
 # create string for slurm submit options for rule
-slurm_args = "--partition={partition} --qos={qos} --mem={mem} --ntasks={ntasks} --ntasks-per-node={ntasks-per-node} --time={time} --hint={hint} --output={output} --error={error} -N {N} -J {J}".format(**job_properties["cluster"])
+slurm_args = "--partition={partition} --qos={qos} --mem={mem} --ntasks={ntasks} --ntasks-per-node={ntasks-per-node} --time={time} --hint={hint} --output={output} --error={error} -n {n} -J {J}".format(**job_properties["cluster"])
 cmdline.append(slurm_args)
 
 # now work on dependencies
